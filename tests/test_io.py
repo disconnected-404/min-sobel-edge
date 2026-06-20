@@ -36,6 +36,14 @@ class TestLoadImage:
         assert result.dtype == np.uint8
         assert result[0, 0] == 255  # 超过 255 被裁剪
 
+    def test_load_from_float_3d_unit_range(self):
+        """3D float 彩色图 [0, 1] 应正确映射到 [0, 255] 的灰度图，不应被双重缩放为全白"""
+        arr = np.full((10, 10, 3), 0.2, dtype=np.float64)  # 浅灰色
+        result = load_image(arr)
+        assert result.ndim == 2
+        assert result.dtype == np.uint8
+        assert 0 < result[0, 0] < 255  # 不应为 0 或 255
+
     def test_load_from_numpy_invalid_dims(self):
         """1D 数组应报错"""
         arr = np.zeros(10, dtype=np.uint8)

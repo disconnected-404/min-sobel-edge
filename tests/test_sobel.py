@@ -87,6 +87,12 @@ class TestSobelEdge:
         with pytest.raises(ValueError, match=r"\[0, 255\]"):
             sobel_edge(image, threshold=300)
 
+    def test_binarize_without_threshold_raises(self):
+        """binarize=True 但未传 threshold 应报错"""
+        image = np.zeros((5, 5), dtype=np.uint8)
+        with pytest.raises(ValueError, match="threshold"):
+            sobel_edge(image, binarize=True)
+
     def test_rejects_color_image(self):
         """应拒绝彩色图像输入"""
         image = np.zeros((10, 10, 3), dtype=np.uint8)

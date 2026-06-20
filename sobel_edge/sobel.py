@@ -39,7 +39,8 @@ def sobel_edge(
     Args:
         image: 输入灰度图像（2D numpy 数组，值域 0-255）
         threshold: 可选阈值（0-255），低于此值的梯度置为 0。默认 None（不设阈值）
-        binarize: 仅在 threshold 不为 None 时生效。
+        binarize: 是否输出二值图。必须与 threshold 同时使用；
+                  threshold=None 时传 binarize=True 会抛出 ValueError。
                   True → 输出二值图（0 或 255）；
                   False → 仅抑制弱边缘，保留梯度强度。默认 False
 
@@ -51,6 +52,9 @@ def sobel_edge(
 
     if threshold is not None and not (0 <= threshold <= 255):
         raise ValueError("threshold 应在 [0, 255] 范围内")
+
+    if binarize and threshold is None:
+        raise ValueError("binarize=True 需要同时指定 threshold")
 
     img = image.astype(np.float64)
 
