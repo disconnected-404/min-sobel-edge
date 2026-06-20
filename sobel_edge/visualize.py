@@ -9,7 +9,7 @@ def compare_plot(
     original: np.ndarray,
     edge: np.ndarray,
     save_path: str | Path | None = None,
-    show: bool = True,
+    show: bool = False,
 ) -> plt.Figure:
     """生成原图与边缘检测结果的并排对比图。
 
@@ -17,7 +17,8 @@ def compare_plot(
         original: 原始灰度图像（2D numpy 数组）
         edge: 边缘检测结果（2D numpy 数组）
         save_path: 可选，保存图片的路径
-        show: 是否显示窗口（默认 True）
+        show: 是否显示窗口（默认 False，避免脚本/CI 环境弹窗）。
+              若后端为非交互式（如 Agg），即使 show=True 也不会弹窗。
 
     Returns:
         matplotlib Figure 对象

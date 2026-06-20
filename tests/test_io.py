@@ -22,6 +22,20 @@ class TestLoadImage:
         assert result.ndim == 2
         assert result.dtype == np.uint8
 
+    def test_load_from_float_2d_unit_range(self):
+        """float 数组 [0, 1] 应线性映射到 [0, 255]"""
+        arr = np.full((8, 8), 0.5, dtype=np.float64)
+        result = load_image(arr)
+        assert result.dtype == np.uint8
+        assert result[0, 0] == 127 or result[0, 0] == 128
+
+    def test_load_from_float_2d_full_range(self):
+        """float 数组超出 [0, 1] 范围时，应裁剪后正常返回"""
+        arr = np.full((8, 8), 300.0, dtype=np.float64)
+        result = load_image(arr)
+        assert result.dtype == np.uint8
+        assert result[0, 0] == 255  # 超过 255 被裁剪
+
     def test_load_from_numpy_invalid_dims(self):
         """1D 数组应报错"""
         arr = np.zeros(10, dtype=np.uint8)

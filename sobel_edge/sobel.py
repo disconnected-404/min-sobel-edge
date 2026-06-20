@@ -29,18 +29,28 @@ def _convolve2d(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     return output
 
 
-def sobel_edge(image: np.ndarray, threshold: int | None = None) -> np.ndarray:
+def sobel_edge(
+    image: np.ndarray,
+    threshold: int | None = None,
+    binarize: bool = False,
+) -> np.ndarray:
     """对灰度图像执行 Sobel 边缘检测。
 
     Args:
         image: 输入灰度图像（2D numpy 数组，值域 0-255）
-        threshold: 可选阈值，低于此值的梯度置为 0。默认 None（不设阈值）
+        threshold: 可选阈值（0-255），低于此值的梯度置为 0。默认 None（不设阈值）
+        binarize: 仅在 threshold 不为 None 时生效。
+                  True → 输出二值图（0 或 255）；
+                  False → 仅抑制弱边缘，保留梯度强度。默认 False
 
     Returns:
-        边缘梯度幅值图（uint8，0-255）
+        边缘梯度幅值图（uint8，0-255）。均匀/平坦区域的 padding 噪声会被抑制。
     """
     if image.ndim != 2:
         raise ValueError("输入必须是灰度图像（2D 数组）")
+
+    if threshold is not None and not (0 <= threshold <= 255):
+        raise ValueError("threshold 应在 [0, 255] 范围内")
 
     img = image.astype(np.float64)
 
@@ -49,12 +59,18 @@ def sobel_edge(image: np.ndarray, threshold: int | None = None) -> np.ndarray:
 
     magnitude = np.sqrt(gx ** 2 + gy ** 2)
 
-    # 归一化到 0-255
-    if magnitude.max() > 0:
-        magnitude = magnitude / magnitude.max() * 255.0
+    # 归一化到 0-255；若最大响应极小（均匀图的 padding 噪声），直接归零
+    max_val = magnitude.max()
+    if max_val > 1e-6:
+        magnitude = magnitude / max_val * 255.0
+    else:
+        magnitude[:] = 0.0
 
     if threshold is not None:
-        magnitude[magnitude < threshold] = 0
+        if binarize:
+            magnitude = np.where(magnitude >= threshold, 255.0, 0.0)
+        else:
+            magnitude[magnitude < threshold] = 0.0
 
     return magnitude.astype(np.uint8)
 
@@ -66,7 +82,8 @@ def sobel_gradient_direction(image: np.ndarray) -> np.ndarray:
         image: 输入灰度图像（2D numpy 数组）
 
     Returns:
-        梯度方向角（弧度，范围 [-pi, pi]），与边缘幅值图同尺寸
+        梯度方向角（弧度，范围 [-pi, pi]），与边缘幅值图同尺寸。
+        平坦区域（gx 与 gy 均接近 0）对应方向无定义，标记为 NaN。
     """
     if image.ndim != 2:
         raise ValueError("输入必须是灰度图像（2D 数组）")
@@ -76,20 +93,31 @@ def sobel_gradient_direction(image: np.ndarray) -> np.ndarray:
     gx = _convolve2d(img, SOBEL_X)
     gy = _convolve2d(img, SOBEL_Y)
 
-    return np.arctan2(gy, gx)
+    angles = np.arctan2(gy, gx)
+
+    # 平坦区域（gx, gy 均近零）方向无定义，标记为 NaN
+    flat_mask = (np.abs(gx) < 1e-6) & (np.abs(gy) < 1e-6)
+    angles[flat_mask] = np.nan
+
+    return angles
 
 
 def classify_direction(angles: np.ndarray) -> np.ndarray:
     """将梯度方向角离散分类为 4 个方向。
 
     Args:
-        angles: arctan2 返回的梯度方向角（弧度）
+        angles: arctan2 返回的梯度方向角（弧度）。NaN 视为无定义。
 
     Returns:
-        分类标签数组：0=水平, 1=垂直, 2=对角线(+45°), 3=对角线(-45°)
+        分类标签数组（int8）：0=水平, 1=垂直, 2=对角线(+45°), 3=对角线(-45°)。
+        NaN 输入位置返回 -1。
     """
-    # 将角度归一化到 [0, 180) 度范围
-    deg = np.degrees(angles) % 180
+    if angles.ndim < 1:
+        raise ValueError("angles 必须是非空的 numpy 数组")
+
+    # 先记录 NaN 位置，再对有效值做归一化分类
+    nan_mask = np.isnan(angles)
+    deg = np.degrees(np.where(nan_mask, 0.0, angles)) % 180
 
     result = np.zeros_like(deg, dtype=np.int8)
 
@@ -105,5 +133,8 @@ def classify_direction(angles: np.ndarray) -> np.ndarray:
 
     # -45° 对角线
     result[(deg >= 112.5) & (deg < 157.5)] = 3
+
+    # 无定义位置标记为 -1
+    result[nan_mask] = -1
 
     return result
